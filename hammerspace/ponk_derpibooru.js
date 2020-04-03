@@ -166,14 +166,14 @@ class Derpibooru {
 
         if(imageData.tag_ids.includes(isWebm)){
             if(imageData.tag_ids.includes(hasSound)){
-                return "https:" + imageURL + ".vidm";
+                return imageURL + ".vidm";
             }
-            return "https:" + imageURL + ".vidalc";
+            return imageURL + ".vidalc";
         }
         if(this.useSpoiler && imageData.tag_ids.includes(explicit)){
-            return "https:" + imageURL + this.spoiler;
+            return imageURL + this.spoiler;
         }
-        return "https:" + imageURL + embed;
+        return imageURL + embed;
     }
 
 
