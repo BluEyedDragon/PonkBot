@@ -288,7 +288,8 @@ class Derpibooru {
                 case 'booru':      return this.API.derpibooru.handleBooru.call(this, user, params, meta);
                 case 'topscoring': return this.API.derpibooru.handleTopscoring.call(this, user, params, meta);
                 case 'derpi':      return this.API.derpibooru.handleDerpi.call(this, user, params, meta);
-                case 'derpset':    return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
+                case 'derpset': return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
+                case 'derpiset': return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
             }
 
         },(message)=>{
@@ -335,7 +336,8 @@ module.exports = {
         'booru':      function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
         'derpi':      function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
         'topscoring': function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
-        'derpset':    function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
+        'derpset': function (user, params, meta) { this.API.derpibooru.handleCommand.call(this, user, params, meta) },
+        'derpiset': function (user, params, meta) { this.API.derpibooru.handleCommand.call(this, user, params, meta) },
     },
     cooldowns: {
         derpibooru: {
