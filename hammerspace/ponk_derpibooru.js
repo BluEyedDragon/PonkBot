@@ -37,6 +37,20 @@ class Derpibooru {
                 timeout   : 15 * 60 * 1000,
                 timestamp : 0,
             },
+
+            filter  : ponk.API.keys.derpiFilter,
+            filters : { everything: '56027', default: '100073' },
+            spoils  : new Array(),
+            logger  : ponk.logger
+        });
+
+        this.filter = this.filter || filters.everything;
+        this.getFilterById(this.filter).then((success)=>{
+            if(success.spoilered_tag_ids) {
+                this.spoils = success.spoilered_tag_ids;
+            }
+        },(error)=>{
+            ponk.logger.log(`[Derpibooru] Load Default Filter: ${error}`)
         });
     }
 
@@ -76,7 +90,7 @@ class Derpibooru {
                     return reject(error);
                 }
                 if(response.statusCode !== 200){ 
-                    return reject(response.statusCode === 400 ? 'Bad Request' : 'Unknown');
+                    return reject(`${response.statusCode} ${response.statusMessage}`);
                 }
                 const result = JSON.parse(body);
 
@@ -112,7 +126,7 @@ class Derpibooru {
             }
 
             // Let us determine how many results this is going to get.
-            const queryTotal = `https://${this.domain}/api/v1/json/search/images?key=${this.key}&q=${query}&per_page=1`
+            const queryTotal = `https://${this.domain}/api/v1/json/search/images?key=${this.key}&q=${query}&per_page=1&filter_id=${this.filter}`
             this.getRequest(queryTotal).then((result)=>{
                 const results = result.total;
                 if(results === 0){
@@ -125,7 +139,7 @@ class Derpibooru {
                 const queries = [];
                 while(pages--){
                     const page = pages+1;
-                    const url = `https://${this.domain}/api/v1/json/search/images?key=${this.key}&q=${query}&sf=score&sd=desc&page=${page}&per_page=50`
+                    const url = `https://${this.domain}/api/v1/json/search/images?key=${this.key}&q=${query}&sf=score&sd=desc&page=${page}&per_page=50&filter_id=${this.filter}`
                     queries.unshift(this.getRequest(url));
                 }
                 Promise.all(queries).then((searchResults)=>{
@@ -170,10 +184,30 @@ class Derpibooru {
             }
             return imageURL + ".vidalc";
         }
-        if(this.useSpoiler && imageData.tag_ids.includes(explicit)){
+
+        var s = imageData.tag_ids.filter(x => this.spoils.includes(x));
+        if(this.useSpoiler && s.length > 0){
             return imageURL + this.spoiler;
         }
         return imageURL + embed;
+    }
+
+    getFilterById(id){
+        return new Promise((resolve, reject)=>{
+            const url = `https://${this.domain}/api/v1/json/filters/${id}?key=${this.key}`;
+            this.logger.debug(`Getting filter ${id}`);
+            this.getRequest(url).then((result)=>{
+                if(result.filter.id){
+                    return resolve(result.filter);
+                }
+            },(error)=>{
+                return reject(error);
+            });
+        });
+    }
+
+    getFilterByName(name) {
+
     }
 
 
@@ -279,6 +313,7 @@ class Derpibooru {
         if(meta.rank < 1 && this.userlist.length > this.API.derpibooru.heavyPop){
             return this.sendPrivate('[Derpibooru] Only registered users when channel is this populated.', user);
         }
+        //TODO: Status command (sends current setting of spoiler, large embeds and filter)
 
         this.checkCooldown({
             type: 'derpibooru', user, modBypass: meta.rank > 2
@@ -288,8 +323,8 @@ class Derpibooru {
                 case 'booru':      return this.API.derpibooru.handleBooru.call(this, user, params, meta);
                 case 'topscoring': return this.API.derpibooru.handleTopscoring.call(this, user, params, meta);
                 case 'derpi':      return this.API.derpibooru.handleDerpi.call(this, user, params, meta);
-                case 'derpset': return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
-                case 'derpiset': return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
+                case 'derpset':    return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
+                case 'derpiset':   return this.API.derpibooru.handleDerpset.call(this, user, params, meta);
             }
 
         },(message)=>{
@@ -314,6 +349,44 @@ class Derpibooru {
             const state = this.API.derpibooru.useSmall && 'On' || 'Off';
             return this.sendMessage(`[Derpibooru] { Always Small Embed: ${state} }`);
         }
+
+        if(params.match(/filter/i)){
+            var filter = params.match(/^filter (.+)/i);
+            if(!isNaN(filter[1])){
+                if(filter[1].match(/^\d+$/)){
+                    const success = (filterData)=>{
+                        this.API.derpibooru.filter = filterData.id;
+                        return this.sendMessage(`[Derpibooru] { Active Filter: ${filterData.name} }`);
+                    };
+
+                    const error = (error)=>{
+                        return this.sendMessage(`[Derpibooru] Something went wrong. ${error}`);
+                    };
+
+                    this.API.derpibooru.getFilterById(filter[1]).then(success, error);
+                }
+            }
+            else{
+                if(filter[1].toLowerCase() == 'everything'){
+                    this.API.derpibooru.filter = this.API.derpibooru.filters.everything;
+                    this.API.derpibooru.spoils = new Array();
+                    return this.sendMessage(`[Derpibooru] { Active Filter: Everything }`)
+                }else if (filter[1].toLowerCase() == 'default'){
+                    var filter = this.API.derpibooru.filters.default;
+                    this.API.derpibooru.filter = filter;
+                    this.API.derpibooru.getFilterById(filter).then((success)=>{
+                        this.API.derpibooru.spoils = success.spoilered_tag_ids;
+                        return this.sendMessage(`[Derpibooru] { Active Filter: Derpibooru Default }`)
+                    },
+                    (error)=>{
+                        this.sendMessage(`[Derpibooru] Something went wrong. ${error}`);
+                    });
+                }
+                else{
+                    //TODO: Name Lookup
+                }
+            }
+        }
     }
 
 }
@@ -336,8 +409,8 @@ module.exports = {
         'booru':      function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
         'derpi':      function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
         'topscoring': function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
-        'derpset': function (user, params, meta) { this.API.derpibooru.handleCommand.call(this, user, params, meta) },
-        'derpiset': function (user, params, meta) { this.API.derpibooru.handleCommand.call(this, user, params, meta) },
+        'derpset':    function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
+        'derpiset':   function(user, params, meta){ this.API.derpibooru.handleCommand.call(this, user, params, meta) },
     },
     cooldowns: {
         derpibooru: {

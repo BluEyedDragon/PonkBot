@@ -73,3 +73,6 @@ prod/
 
 # Fuck package lock
 package-lock.json
+
+# Visual Studio files
+/.vs
